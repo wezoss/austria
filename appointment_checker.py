@@ -104,7 +104,7 @@ def perform_appointment_check():
             return
         soup2 = BeautifulSoup(response2.content, 'html.parser')
 
-        # 4️⃣ Now find CalendarId dropdown
+        # 4️⃣ Now find CalendarId dropdown and select "bachelor" option if present
         calendar_select = soup2.find('select', {'id': 'CalendarId'})
         if not calendar_select:
             send_telegram_message("❌ CalendarId dropdown not found after Office selection (even after clicking Next)")
@@ -112,12 +112,12 @@ def perform_appointment_check():
         calendar_options = calendar_select.find_all('option')
         selected_option = None
         for opt in calendar_options:
-            opt_text = opt.text.lower()
-            if "student" in opt_text or "bachelor" in opt_text:
+            print(f"CalendarId option: value={opt.get('value')}, text={opt.text.strip()}")
+            if "bachelor" in opt.text.lower():
                 selected_option = opt
                 break
         if not selected_option:
-            send_telegram_message("❌ No 'student' or 'bachelor' option in CalendarId")
+            send_telegram_message("❌ No 'bachelor' option in CalendarId")
             return
 
         chosen_cal_value = selected_option.get('value')
