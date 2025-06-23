@@ -30,11 +30,11 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
         print(f"❌ Error sending Telegram: {e}")
         return False
 
-def print_snippet(text, phrase, window=80):
+def print_snippet(text, phrase=None, window=80):
     """Show a snippet of text around a phrase for debugging."""
-    idx = text.lower().find(phrase.lower())
-    if idx == -1:
+    if not phrase or phrase.lower() not in text.lower():
         return text[:window] + ("..." if len(text) > window else "")
+    idx = text.lower().find(phrase.lower())
     start = max(0, idx - window//2)
     end = min(len(text), idx + len(phrase) + window//2)
     return text[start:end].replace('\n', '\\n')
@@ -56,7 +56,6 @@ def perform_appointment_check():
         print(f"   ...Status: {response1.status_code}")
         soup1 = BeautifulSoup(response1.content, 'html.parser')
 
-        # Office selection
         form1 = soup1.find('form')
         office_select = form1.find('select', {'id': 'Office'}) if form1 else None
         if not office_select:
@@ -101,7 +100,6 @@ def perform_appointment_check():
         print(f"   ...Status: {response2.status_code}")
         soup2 = BeautifulSoup(response2.content, 'html.parser')
 
-        # CalendarId selection
         calendar_select = soup2.find('select', {'id': 'CalendarId'})
         if not calendar_select:
             print("❌ CalendarId dropdown not found")
@@ -170,6 +168,11 @@ def perform_appointment_check():
             current_response = session.post(form_action_next, data=form_data_next, timeout=30)
             print(f"   ...Status: {current_response.status_code}")
 
+        # Save final page for debugging
+        with open("final_page.html", "w", encoding="utf-8") as f:
+            f.write(current_response.text)
+        print("Saved final page HTML to final_page.html")
+
         # Final page: Check for "no appointments" message
         print("➡️ Step 6: Inspect final page for appointment status")
         final_soup = BeautifulSoup(current_response.content, 'html.parser')
@@ -194,7 +197,7 @@ def perform_appointment_check():
             found = True
             send_telegram_message("🔄 Status: No appointments available (checker working normally)")
         else:
-            snippet = print_snippet(page_text, expected_message)
+            snippet = print_snippet(page_text)
             print(f"   ...No error message found. Page text snippet:\n{snippet}")
             send_telegram_message("🎉 POSSIBLE APPOINTMENTS FOUND! No error message detected on final page!")
 
