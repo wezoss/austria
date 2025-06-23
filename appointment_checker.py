@@ -166,70 +166,17 @@ def perform_appointment_check():
             current_response = session.post(form_action_next, data=form_data_next, timeout=30)
             print(f"   ...Status: {current_response.status_code}")
 
-        # --- NEW: Submit reservation details form ---
-        print(f"➡️ Step 6: Submit reservation details form")
-        soup = BeautifulSoup(current_response.content, 'html.parser')
-        form = soup.find('form')
-        if not form:
-            print("❌ Reservation form not found!")
-            send_telegram_message("❌ Reservation form not found!")
-            return
-
-        form_data_reserve = {}
-        for inp in form.find_all(['input', 'select']):
-            name = inp.get('name')
-            if not name:
-                continue
-            if inp.get('type') == 'hidden':
-                form_data_reserve[name] = inp.get('value', '')
-            elif inp.name == 'select' and name == 'PersonCount':
-                # Default to the first option (should be '1')
-                options = inp.find_all('option')
-                if options:
-                    form_data_reserve[name] = options[0].get('value', '1')
-                else:
-                    form_data_reserve[name] = '1'
-            elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
-                form_data_reserve[name] = inp.get('value')
-
-        form_action_reserve = form.get('action', '')
-        if form_action_reserve.startswith('/'):
-            form_action_reserve = "https://appointment.bmeia.gv.at" + form_action_reserve
-        elif not form_action_reserve.startswith('http'):
-            form_action_reserve = "https://appointment.bmeia.gv.at/" + form_action_reserve
-
-        # Increase timeout for this request in case the server is slow
-        try:
-            current_response = session.post(form_action_reserve, data=form_data_reserve, timeout=90)
-        except requests.exceptions.ReadTimeout:
-            print("❌ Final POST timed out after 90 seconds!")
-            send_telegram_message("❌ Final POST timed out after 90 seconds!")
-            return
-
-        print(f"   ...Status: {current_response.status_code}")
-
-        # Print and check the REAL final page!
+        # No further submission! Just check the result page.
         print("========= FINAL PAGE HTML START =========")
         print(current_response.text)
         print("========= END FINAL PAGE HTML =========")
 
-        print("➡️ Step 7: Inspect final page for appointment status")
+        print("➡️ Step 6: Inspect final page for appointment status")
         final_soup = BeautifulSoup(current_response.content, 'html.parser')
         expected_message = "For your selection there are unfortunately no appointments available"
-        error_message_element = final_soup.find('p', class_='message-error')
         page_text = final_soup.get_text(separator=" ", strip=True)
         found = False
-        if error_message_element:
-            error_text = error_message_element.get_text().strip()
-            print(f"   ...Found <p class='message-error'>: {error_text!r}")
-            if error_text.lower() == expected_message.lower():
-                found = True
-                print("Result: No appointments available")
-                send_telegram_message("🔄 Status: No appointments available (checker working normally)")
-            else:
-                print("Result: Different error message")
-                send_telegram_message(f"⚠️ Unexpected error message:\n\n{error_text}")
-        elif expected_message.lower() in page_text.lower():
+        if expected_message.lower() in page_text.lower():
             snippet = print_snippet(page_text, expected_message)
             print(f"   ...Found expected message in page: {snippet!r}")
             found = True
