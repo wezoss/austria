@@ -36,6 +36,8 @@ def perform_appointment_check():
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
+        "Origin": "https://appointment.bmeia.gv.at",
+        "Referer": "https://appointment.bmeia.gv.at/"
     })
 
     try:
@@ -73,6 +75,15 @@ def perform_appointment_check():
                 form_data1[name] = inp.get('value', '')
             elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
                 form_data1[name] = inp.get('value')
+
+        # Debug print
+        print("=== DEBUG: All Office Form Fields ===")
+        for inp in form1.find_all(['input', 'select']):
+            print(f" - tag: {inp.name} name: {inp.get('name')} type: {inp.get('type')} value: {inp.get('value')}")
+        print("=== DEBUG: Data to submit for Office ===")
+        print(form_data1)
+        print("=== DEBUG: Cookies being sent ===")
+        print(session.cookies.get_dict())
 
         form_action1 = form1.get('action', '')
         if form_action1.startswith('/'):
