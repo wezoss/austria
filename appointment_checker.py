@@ -198,7 +198,14 @@ def perform_appointment_check():
         elif not form_action_reserve.startswith('http'):
             form_action_reserve = "https://appointment.bmeia.gv.at/" + form_action_reserve
 
-        current_response = session.post(form_action_reserve, data=form_data_reserve, timeout=30)
+        # Increase timeout for this request in case the server is slow
+        try:
+            current_response = session.post(form_action_reserve, data=form_data_reserve, timeout=90)
+        except requests.exceptions.ReadTimeout:
+            print("❌ Final POST timed out after 90 seconds!")
+            send_telegram_message("❌ Final POST timed out after 90 seconds!")
+            return
+
         print(f"   ...Status: {current_response.status_code}")
 
         # Print and check the REAL final page!
