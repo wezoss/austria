@@ -71,8 +71,8 @@ def perform_appointment_check():
                 form_data1[name] = kairo_option.get('value')
             elif inp.get('type') == 'hidden':
                 form_data1[name] = inp.get('value', '')
-        # Add the "Command" field with value "Next"
-        form_data1["Command"] = "Next"
+            elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
+                form_data1[name] = inp.get('value')
 
         form_action1 = form1.get('action', '')
         if form_action1.startswith('/'):
@@ -115,7 +115,8 @@ def perform_appointment_check():
                 form_data2[name] = selected_option.get('value')
             elif inp.get('type') == 'hidden':
                 form_data2[name] = inp.get('value', '')
-        form_data2["Command"] = "Next"
+            elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
+                form_data2[name] = inp.get('value')
 
         form_action2 = form2.get('action', '')
         if form_action2.startswith('/'):
@@ -137,7 +138,8 @@ def perform_appointment_check():
                     continue
                 if inp.get('type') == 'hidden':
                     form_data_next[name] = inp.get('value', '')
-            form_data_next["Command"] = "Next"
+                elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
+                    form_data_next[name] = inp.get('value')
             form_action_next = form.get('action', '')
             if form_action_next.startswith('/'):
                 form_action_next = "https://appointment.bmeia.gv.at" + form_action_next
