@@ -11,7 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Use browser-actions/setup-chrome to always get a matching Chrome+Chromedriver pair.
       - name: Setup Chrome
         uses: browser-actions/setup-chrome@v1
 
