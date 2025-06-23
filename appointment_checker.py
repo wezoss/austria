@@ -18,7 +18,6 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
         print("Telegram credentials not set.")
         return
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    # Limit message to Telegram's 4096 char max
     if len(message) > 4000:
         message = message[:4000] + "\n... (truncated)"
     formatted_message = (
@@ -73,7 +72,6 @@ def perform_actions():
         for opt in options:
             print(f"- {opt}")
 
-        # Telegram if changed
         if current_count != expected_count:
             send_telegram_message(
                 f"⚠️ *Options changed*: found *{current_count}* vs expected *{expected_count}*"
@@ -94,7 +92,6 @@ def perform_actions():
             send_telegram_message("❌ No option containing 'Student' or 'Bachelor' found!")
             return
 
-        # Click 'Next' three times
         for i in range(3):
             next_button = driver.find_element(By.XPATH, "//input[@name='Command' and @value='Next']")
             next_button.click()
@@ -103,7 +100,7 @@ def perform_actions():
             )
 
         expected_message = "For your selection there are unfortunately no appointments available"
-        time.sleep(2)  # Wait for possible error message to appear
+        time.sleep(2)
 
         try:
             error_message = driver.find_element(By.CSS_SELECTOR, "p.message-error")
