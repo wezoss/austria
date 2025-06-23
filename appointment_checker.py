@@ -30,6 +30,15 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
         print(f"❌ Error sending Telegram: {e}")
         return False
 
+def print_snippet(text, phrase, window=80):
+    """Show a snippet of text around a phrase for debugging."""
+    idx = text.lower().find(phrase.lower())
+    if idx == -1:
+        return text[:window] + ("..." if len(text) > window else "")
+    start = max(0, idx - window//2)
+    end = min(len(text), idx + len(phrase) + window//2)
+    return text[start:end].replace('\n', '\\n')
+
 def perform_appointment_check():
     session = requests.Session()
     session.headers.update({
@@ -41,17 +50,16 @@ def perform_appointment_check():
     })
 
     try:
-        # 1️⃣ Load main page
+        print("➡️ Step 1: Load main page")
         response1 = session.get("https://appointment.bmeia.gv.at", timeout=30)
-        if response1.status_code != 200:
-            send_telegram_message(f"❌ Failed to load main page: HTTP {response1.status_code}")
-            return
+        print(f"   ...Status: {response1.status_code}")
         soup1 = BeautifulSoup(response1.content, 'html.parser')
 
-        # 2️⃣ Prepare Office form and submit with "Next"
+        # Office selection
         form1 = soup1.find('form')
         office_select = form1.find('select', {'id': 'Office'}) if form1 else None
         if not office_select:
+            print("❌ Office dropdown not found")
             send_telegram_message("❌ Office dropdown not found")
             return
 
@@ -61,10 +69,10 @@ def perform_appointment_check():
                 kairo_option = option
                 break
         if not kairo_option:
+            print("❌ KAIRO option not found")
             send_telegram_message("❌ KAIRO option not found in Office dropdown")
             return
 
-        # Use the value if present, else use the text.
         chosen_value = kairo_option.get('value')
         if chosen_value is None or chosen_value == "":
             chosen_value = kairo_option.text.strip()
@@ -87,17 +95,15 @@ def perform_appointment_check():
         elif not form_action1.startswith('http'):
             form_action1 = "https://appointment.bmeia.gv.at/" + form_action1
 
-        # 3️⃣ Submit Office form with "Next"
-        time.sleep(2)
+        print(f"➡️ Step 2: Submit Office form with Office={form_data1['Office']!r}")
         response2 = session.post(form_action1, data=form_data1, timeout=30)
-        if response2.status_code != 200:
-            send_telegram_message(f"❌ Failed to submit Office selection: HTTP {response2.status_code}")
-            return
+        print(f"   ...Status: {response2.status_code}")
         soup2 = BeautifulSoup(response2.content, 'html.parser')
 
-        # 4️⃣ Find CalendarId dropdown and select "bachelor" option
+        # CalendarId selection
         calendar_select = soup2.find('select', {'id': 'CalendarId'})
         if not calendar_select:
+            print("❌ CalendarId dropdown not found")
             send_telegram_message("❌ CalendarId dropdown not found after Office selection (even after clicking Next)")
             return
         calendar_options = calendar_select.find_all('option')
@@ -107,6 +113,7 @@ def perform_appointment_check():
                 selected_option = opt
                 break
         if not selected_option:
+            print("❌ No 'bachelor' option in CalendarId")
             send_telegram_message("❌ No 'bachelor' option in CalendarId")
             return
 
@@ -114,7 +121,6 @@ def perform_appointment_check():
         if chosen_cal_value is None or chosen_cal_value == "":
             chosen_cal_value = selected_option.text.strip()
 
-        # Prepare calendar form
         form2 = soup2.find('form')
         form_data2 = {}
         for inp in form2.find_all(['input', 'select']):
@@ -134,21 +140,23 @@ def perform_appointment_check():
         elif not form_action2.startswith('http'):
             form_action2 = "https://appointment.bmeia.gv.at/" + form_action2
 
-        # 5️⃣ Submit CalendarId form with "Next"
+        print(f"➡️ Step 3: Submit CalendarId form with CalendarId={form_data2['CalendarId']!r}")
         current_response = session.post(form_action2, data=form_data2, timeout=30)
+        print(f"   ...Status: {current_response.status_code}")
 
-        # 6️⃣ Submit next form with "Next" only (no extra input)
-        for _ in range(2):
+        # Next 2 forms: just "Next"
+        for idx in range(2):
+            print(f"➡️ Step {4+idx}: Submit form with only 'Next'")
             soup = BeautifulSoup(current_response.content, 'html.parser')
             form = soup.find('form')
             if not form:
+                print("   ...No more forms found.")
                 break
             form_data_next = {}
             for inp in form.find_all(['input', 'select']):
                 name = inp.get('name')
                 if not name:
                     continue
-                # Only send hidden fields and the submit "Next"
                 if inp.get('type') == 'hidden':
                     form_data_next[name] = inp.get('value', '')
                 elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
@@ -159,22 +167,36 @@ def perform_appointment_check():
             elif not form_action_next.startswith('http'):
                 form_action_next = "https://appointment.bmeia.gv.at/" + form_action_next
             current_response = session.post(form_action_next, data=form_data_next, timeout=30)
+            print(f"   ...Status: {current_response.status_code}")
 
-        # 7️⃣ Check for expected message or appointments
+        # Final page: Check for "no appointments" message
+        print("➡️ Step 6: Inspect final page for appointment status")
         final_soup = BeautifulSoup(current_response.content, 'html.parser')
         expected_message = "For your selection there are unfortunately no appointments available"
         error_message_element = final_soup.find('p', class_='message-error')
+        page_text = final_soup.get_text(separator=" ", strip=True)
+        found = False
         if error_message_element:
             error_text = error_message_element.get_text().strip()
+            print(f"   ...Found message-error element: {error_text!r}")
             if expected_message in error_text:
+                found = True
                 send_telegram_message("🔄 Status: No appointments available (checker working normally)")
             else:
+                print(f"   ...Unexpected error message: {error_text!r}")
                 send_telegram_message(f"⚠️ Unexpected error message:\n\n{error_text}")
+        elif expected_message.lower() in page_text.lower():
+            # Sometimes it's not in message-error but somewhere else
+            snippet = print_snippet(page_text, expected_message)
+            print(f"   ...Found expected message in page: {snippet!r}")
+            found = True
+            send_telegram_message("🔄 Status: No appointments available (checker working normally)")
         else:
-            # If the message is not there, appointments may be possible!
+            snippet = print_snippet(page_text, expected_message)
+            print(f"   ...No error message found. Page text snippet:\n{snippet}")
             send_telegram_message("🎉 POSSIBLE APPOINTMENTS FOUND! No error message detected on final page!")
 
-        print("✅ Appointment check completed successfully")
+        print(f"✅ Appointment check completed. No appointments: {found}")
 
     except Exception as e:
         send_telegram_message(f"❌ Exception: {str(e)}")
