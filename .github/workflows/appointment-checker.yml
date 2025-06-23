@@ -3,7 +3,6 @@ name: Appointment Checker
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/15 * * * *"
 
 jobs:
   check:
