@@ -11,7 +11,6 @@ from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 
-# --- Telegram Notification ---
 def send_telegram_message(message, bot_token=None, chat_id=None):
     bot_token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID")
@@ -19,7 +18,6 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
         print("Telegram credentials not set.")
         return
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    # Limit message to Telegram's 4096 char max
     if len(message) > 4000:
         message = message[:4000] + "\n... (truncated)"
     formatted_message = (
@@ -68,17 +66,50 @@ def perform_actions():
         print("Current URL:", driver.current_url)
         print("Page Title:", driver.title)
 
-        # Check for error message immediately after submitting the office selection
         time.sleep(2)
+        # Check if error message and/or calendar dropdown is present
+        error_message = None
+        calendar_present = False
+        appointment_heading = False
+
         try:
-            error_message = driver.find_element(By.CSS_SELECTOR, "p.message-error")
-            if error_message and "unfortunately no appointments available" in error_message.text:
+            error_elem = driver.find_element(By.CSS_SELECTOR, "p.message-error")
+            error_message = error_elem.text.strip()
+        except Exception:
+            pass
+
+        try:
+            driver.find_element(By.ID, "CalendarId")
+            calendar_present = True
+        except Exception:
+            calendar_present = False
+
+        try:
+            # check for appointment heading
+            headings = driver.find_elements(By.TAG_NAME, "h2")
+            for h in headings:
+                if "Appointments available" in h.text:
+                    appointment_heading = True
+                    break
+        except Exception:
+            pass
+
+        if error_message:
+            print(f"Error message on page: {error_message}")
+            # If error message but appointments or calendar also present, treat as possible appointments
+            if calendar_present or appointment_heading:
+                send_telegram_message("🎉 *Possible appointments found!*\nCheck the website immediately.")
+                print("Possible appointments found (calendar or heading present despite error).")
+                return
+            else:
                 send_telegram_message("❌ No appointments found.")
                 print("No appointments found. Exiting early.")
                 return
-        except Exception:
-            # No error message found, continue
-            pass
+
+        if not calendar_present:
+            send_telegram_message("❌ No calendar available and no explicit error -- site may have changed.")
+            print("No calendar dropdown found and no explicit error. Exiting.")
+            return
 
         print("Waiting for CalendarId dropdown...")
         WebDriverWait(driver, 10).until(
@@ -126,7 +157,6 @@ def perform_actions():
 
         expected_message = "For your selection there are unfortunately no appointments available"
         time.sleep(2)
-
         try:
             error_message = driver.find_element(By.CSS_SELECTOR, "p.message-error")
             print(f"Error message: {error_message.text}")
