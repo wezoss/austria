@@ -50,6 +50,7 @@ def perform_appointment_check():
     })
 
     try:
+        print(f"🚀 Appointment checker started at {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
         print("➡️ Step 1: Load main page")
         response1 = session.get("https://appointment.bmeia.gv.at", timeout=30)
         print(f"   ...Status: {response1.status_code}")
@@ -178,12 +179,13 @@ def perform_appointment_check():
         found = False
         if error_message_element:
             error_text = error_message_element.get_text().strip()
-            print(f"   ...Found message-error element: {error_text!r}")
-            if expected_message in error_text:
+            print(f"   ...Found <p class='message-error'>: {error_text!r}")
+            if error_text.lower() == expected_message.lower():
                 found = True
+                print("Result: No appointments available")
                 send_telegram_message("🔄 Status: No appointments available (checker working normally)")
             else:
-                print(f"   ...Unexpected error message: {error_text!r}")
+                print("Result: Different error message")
                 send_telegram_message(f"⚠️ Unexpected error message:\n\n{error_text}")
         elif expected_message.lower() in page_text.lower():
             # Sometimes it's not in message-error but somewhere else
@@ -203,5 +205,4 @@ def perform_appointment_check():
         print(f"❌ Exception: {str(e)}")
 
 if __name__ == "__main__":
-    print(f"🚀 Appointment checker started at {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
     perform_appointment_check()
