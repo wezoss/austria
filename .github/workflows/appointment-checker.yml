@@ -11,21 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Google Chrome
-        run: |
-          wget -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo apt-get update
-          sudo apt-get install -y /tmp/chrome.deb
+      # Use browser-actions/setup-chrome to always get a matching Chrome+Chromedriver pair.
+      - name: Setup Chrome
+        uses: browser-actions/setup-chrome@v1
 
-      - name: Install ChromeDriver matching Chrome version
-        run: |
-          CHROME_VERSION=$(google-chrome --version | awk '{print $3}')
-          CHROMEDRIVER_VERSION=$(echo $CHROME_VERSION | cut -d. -f1-3)
-          wget -O /tmp/chromedriver.zip "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip" || \
-          wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip"
-          unzip /tmp/chromedriver.zip -d /tmp/chromedriver
-          sudo mv /tmp/chromedriver/chromedriver /usr/local/bin/chromedriver
-          sudo chmod +x /usr/local/bin/chromedriver
+      - name: Setup Chromedriver
+        uses: nanasess/setup-chromedriver@v2
+        with:
+          chromedriver-version: 'matching'
 
       - name: Set up Python
         uses: actions/setup-python@v5
