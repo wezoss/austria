@@ -207,4 +207,4 @@ def perform_appointment_check():
         print(f"❌ Exception: {str(e)}")
 
 if __name__ == "__main__":
-    perform_appointment_check()
+    perform_appointment_check() 
