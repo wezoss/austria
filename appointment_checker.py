@@ -3,6 +3,7 @@ import time
 import logging
 import os
 import requests
+import traceback
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -18,6 +19,7 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
         print("Telegram credentials not set.")
         return
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    # Limit message to Telegram's 4096 char max
     if len(message) > 4000:
         message = message[:4000] + "\n... (truncated)"
     formatted_message = (
@@ -46,19 +48,23 @@ def perform_actions():
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--window-size=1920,1080')
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = None
 
     print("Starting appointment check...")
 
     try:
+        driver = webdriver.Chrome(options=chrome_options)
+
         driver.get("https://appointment.bmeia.gv.at")
         time.sleep(3)
 
+        print("Selecting Office...")
         dropdown = Select(driver.find_element(By.ID, "Office"))
         dropdown.select_by_visible_text("KAIRO")
         submit_button = driver.find_element(By.NAME, "Command")
         submit_button.click()
 
+        print("Waiting for CalendarId dropdown...")
         WebDriverWait(driver, 10).until(
             EC.visibility_of_element_located((By.ID, "CalendarId"))
         )
@@ -72,6 +78,7 @@ def perform_actions():
         for opt in options:
             print(f"- {opt}")
 
+        # Telegram if changed
         if current_count != expected_count:
             send_telegram_message(
                 f"⚠️ *Options changed*: found *{current_count}* vs expected *{expected_count}*"
@@ -92,7 +99,9 @@ def perform_actions():
             send_telegram_message("❌ No option containing 'Student' or 'Bachelor' found!")
             return
 
+        # Click 'Next' three times
         for i in range(3):
+            print(f"Clicking Next button ({i+1}/3)...")
             next_button = driver.find_element(By.XPATH, "//input[@name='Command' and @value='Next']")
             next_button.click()
             WebDriverWait(driver, 10).until(
@@ -100,7 +109,7 @@ def perform_actions():
             )
 
         expected_message = "For your selection there are unfortunately no appointments available"
-        time.sleep(2)
+        time.sleep(2)  # Wait for possible error message to appear
 
         try:
             error_message = driver.find_element(By.CSS_SELECTOR, "p.message-error")
@@ -113,11 +122,13 @@ def perform_actions():
             send_telegram_message("🎉 *Possible appointments found!*\nCheck the website immediately.")
 
     except Exception as e:
-        send_telegram_message(f"❗ Error occurred: {e}")
-        print(f"An error occurred: {e}")
+        tb = traceback.format_exc()
+        send_telegram_message(f"❗ Error occurred: {type(e).__name__}: {e}\n\nTraceback (last lines):\n{tb[-1000:]}")
+        print(f"An error occurred: {e}\n{tb}")
     finally:
         time.sleep(2)
-        driver.quit()
+        if driver:
+            driver.quit()
 
 if __name__ == "__main__":
     print(f"Script started at {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
