@@ -54,6 +54,11 @@ def perform_appointment_check():
         if not office_select:
             send_telegram_message("❌ Office dropdown not found")
             return
+
+        print("=== DEBUG: Office Options ===")
+        for option in office_select.find_all('option'):
+            print(f"text: {option.text!r}, value: {option.get('value')!r}")
+
         kairo_option = None
         for option in office_select.find_all('option'):
             if 'KAIRO' in option.text.upper():
@@ -63,23 +68,23 @@ def perform_appointment_check():
             send_telegram_message("❌ KAIRO option not found in Office dropdown")
             return
 
-        # Prepare form data for Office
+        # Use the value if present, else use the text.
+        chosen_value = kairo_option.get('value')
+        if chosen_value is None or chosen_value == "":
+            chosen_value = kairo_option.text.strip()
+
         form_data1 = {}
         for inp in form1.find_all(['input', 'select']):
             name = inp.get('name')
             if not name:
                 continue
             if inp.name == 'select' and name == 'Office':
-                form_data1[name] = kairo_option.get('value')
+                form_data1[name] = chosen_value
             elif inp.get('type') == 'hidden':
                 form_data1[name] = inp.get('value', '')
             elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
                 form_data1[name] = inp.get('value')
 
-        # Debug print
-        print("=== DEBUG: All Office Form Fields ===")
-        for inp in form1.find_all(['input', 'select']):
-            print(f" - tag: {inp.name} name: {inp.get('name')} type: {inp.get('type')} value: {inp.get('value')}")
         print("=== DEBUG: Data to submit for Office ===")
         print(form_data1)
         print("=== DEBUG: Cookies being sent ===")
@@ -115,6 +120,10 @@ def perform_appointment_check():
             send_telegram_message("❌ No 'student' or 'bachelor' option in CalendarId")
             return
 
+        chosen_cal_value = selected_option.get('value')
+        if chosen_cal_value is None or chosen_cal_value == "":
+            chosen_cal_value = selected_option.text.strip()
+
         # Prepare calendar form
         form2 = soup2.find('form')
         form_data2 = {}
@@ -123,7 +132,7 @@ def perform_appointment_check():
             if not name:
                 continue
             if inp.name == 'select' and name == 'CalendarId':
-                form_data2[name] = selected_option.get('value')
+                form_data2[name] = chosen_cal_value
             elif inp.get('type') == 'hidden':
                 form_data2[name] = inp.get('value', '')
             elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
