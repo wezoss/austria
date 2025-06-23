@@ -162,7 +162,7 @@ def perform_appointment_check():
             current_response = session.post(form_action_next, data=form_data_next, timeout=30)
             print(f"   ...Status: {current_response.status_code}")
 
-        # Now submit the reservation form with PersonCount and Command=Next
+        # Step 6: Submit reservation form (PersonCount, Command=Next)
         print(f"➡️ Step 6: Submit reservation form")
         soup = BeautifulSoup(current_response.content, 'html.parser')
         form = soup.find('form')
@@ -179,7 +179,7 @@ def perform_appointment_check():
             if inp.get('type') == 'hidden':
                 form_data_reserve[name] = inp.get('value', '')
             elif inp.name == 'select' and name == 'PersonCount':
-                # pick value by text (should be '1')
+                # Get the option value for '1' (or default to '1')
                 options = inp.find_all('option')
                 for opt in options:
                     if opt.text.strip() == '1':
@@ -187,8 +187,10 @@ def perform_appointment_check():
                         break
                 else:
                     form_data_reserve[name] = '1'
-            elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
-                form_data_reserve[name] = inp.get('value')
+            # Do not automatically add submit buttons here
+
+        # Add the required "Command=Next" to actually submit
+        form_data_reserve["Command"] = "Next"
 
         form_action_reserve = form.get('action', '')
         if form_action_reserve.startswith('/'):
@@ -199,11 +201,12 @@ def perform_appointment_check():
         current_response = session.post(form_action_reserve, data=form_data_reserve, timeout=30)
         print(f"   ...Status: {current_response.status_code}")
 
+        # Now print and check the REAL final page!
         print("========= FINAL PAGE HTML START =========")
         print(current_response.text)
         print("========= END FINAL PAGE HTML =========")
 
-        print("➡️ Step 7: Inspect real final page for appointment status")
+        print("➡️ Step 7: Inspect final page for appointment status")
         final_soup = BeautifulSoup(current_response.content, 'html.parser')
         expected_message = "For your selection there are unfortunately no appointments available"
         page_text = final_soup.get_text(separator=" ", strip=True)
