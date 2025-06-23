@@ -55,10 +55,6 @@ def perform_appointment_check():
             send_telegram_message("❌ Office dropdown not found")
             return
 
-        print("=== DEBUG: Office Options ===")
-        for option in office_select.find_all('option'):
-            print(f"text: {option.text!r}, value: {option.get('value')!r}")
-
         kairo_option = None
         for option in office_select.find_all('option'):
             if 'KAIRO' in option.text.upper():
@@ -85,11 +81,6 @@ def perform_appointment_check():
             elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
                 form_data1[name] = inp.get('value')
 
-        print("=== DEBUG: Data to submit for Office ===")
-        print(form_data1)
-        print("=== DEBUG: Cookies being sent ===")
-        print(session.cookies.get_dict())
-
         form_action1 = form1.get('action', '')
         if form_action1.startswith('/'):
             form_action1 = "https://appointment.bmeia.gv.at" + form_action1
@@ -104,7 +95,7 @@ def perform_appointment_check():
             return
         soup2 = BeautifulSoup(response2.content, 'html.parser')
 
-        # 4️⃣ Now find CalendarId dropdown and select "bachelor" option if present
+        # 4️⃣ Find CalendarId dropdown and select "bachelor" option
         calendar_select = soup2.find('select', {'id': 'CalendarId'})
         if not calendar_select:
             send_telegram_message("❌ CalendarId dropdown not found after Office selection (even after clicking Next)")
@@ -112,7 +103,6 @@ def perform_appointment_check():
         calendar_options = calendar_select.find_all('option')
         selected_option = None
         for opt in calendar_options:
-            print(f"CalendarId option: value={opt.get('value')}, text={opt.text.strip()}")
             if "bachelor" in opt.text.lower():
                 selected_option = opt
                 break
@@ -144,8 +134,10 @@ def perform_appointment_check():
         elif not form_action2.startswith('http'):
             form_action2 = "https://appointment.bmeia.gv.at/" + form_action2
 
-        # 5️⃣ Click next 2 more times
+        # 5️⃣ Submit CalendarId form with "Next"
         current_response = session.post(form_action2, data=form_data2, timeout=30)
+
+        # 6️⃣ Submit next form with "Next" only (no extra input)
         for _ in range(2):
             soup = BeautifulSoup(current_response.content, 'html.parser')
             form = soup.find('form')
@@ -156,6 +148,7 @@ def perform_appointment_check():
                 name = inp.get('name')
                 if not name:
                     continue
+                # Only send hidden fields and the submit "Next"
                 if inp.get('type') == 'hidden':
                     form_data_next[name] = inp.get('value', '')
                 elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
@@ -167,17 +160,18 @@ def perform_appointment_check():
                 form_action_next = "https://appointment.bmeia.gv.at/" + form_action_next
             current_response = session.post(form_action_next, data=form_data_next, timeout=30)
 
-        # 6️⃣ Check for expected message or appointments
+        # 7️⃣ Check for expected message or appointments
         final_soup = BeautifulSoup(current_response.content, 'html.parser')
         expected_message = "For your selection there are unfortunately no appointments available"
         error_message_element = final_soup.find('p', class_='message-error')
         if error_message_element:
             error_text = error_message_element.get_text().strip()
-            if error_text == expected_message:
+            if expected_message in error_text:
                 send_telegram_message("🔄 Status: No appointments available (checker working normally)")
             else:
                 send_telegram_message(f"⚠️ Unexpected error message:\n\n{error_text}")
         else:
+            # If the message is not there, appointments may be possible!
             send_telegram_message("🎉 POSSIBLE APPOINTMENTS FOUND! No error message detected on final page!")
 
         print("✅ Appointment check completed successfully")
