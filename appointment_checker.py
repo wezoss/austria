@@ -57,12 +57,17 @@ def perform_actions():
 
         driver.get("https://appointment.bmeia.gv.at")
         time.sleep(3)
+        print("Current URL:", driver.current_url)
+        print("Page Title:", driver.title)
 
         print("Selecting Office...")
         dropdown = Select(driver.find_element(By.ID, "Office"))
         dropdown.select_by_visible_text("KAIRO")
         submit_button = driver.find_element(By.NAME, "Command")
         submit_button.click()
+        print("Submitted office selection.")
+        print("Current URL:", driver.current_url)
+        print("Page Title:", driver.title)
 
         print("Waiting for CalendarId dropdown...")
         WebDriverWait(driver, 10).until(
@@ -107,6 +112,8 @@ def perform_actions():
             WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, "//input[@name='Command' and @value='Next']"))
             )
+            print("Current URL:", driver.current_url)
+            print("Page Title:", driver.title)
 
         expected_message = "For your selection there are unfortunately no appointments available"
         time.sleep(2)  # Wait for possible error message to appear
@@ -123,7 +130,24 @@ def perform_actions():
 
     except Exception as e:
         tb = traceback.format_exc()
-        send_telegram_message(f"❗ Error occurred: {type(e).__name__}: {e}\n\nTraceback (last lines):\n{tb[-1000:]}")
+        page_source = ""
+        current_url = ""
+        title = ""
+        if driver:
+            try:
+                current_url = driver.current_url
+                title = driver.title
+                page_source = driver.page_source
+                if len(page_source) > 1500:
+                    page_source = page_source[:1500] + "\n... (truncated)"
+            except Exception:
+                pass
+        send_telegram_message(
+            f"❗ Error occurred: {type(e).__name__}: {e}\n\n"
+            f"Traceback (last lines):\n{tb[-1000:]}\n"
+            f"URL: {current_url}\nTitle: {title}\n"
+            f"Page source snippet:\n{page_source}"
+        )
         print(f"An error occurred: {e}\n{tb}")
     finally:
         time.sleep(2)
