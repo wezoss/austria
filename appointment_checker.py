@@ -40,7 +40,6 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
         print(f"Failed to send Telegram message: {e}")
 
 def perform_actions():
-    # Headless Chromium setup for GitHub Actions Linux
     chrome_options = Options()
     chrome_options.binary_location = '/usr/bin/chromium-browser'
     chrome_options.add_argument('--headless')
@@ -69,6 +68,18 @@ def perform_actions():
         print("Current URL:", driver.current_url)
         print("Page Title:", driver.title)
 
+        # Check for error message immediately after submitting the office selection
+        time.sleep(2)
+        try:
+            error_message = driver.find_element(By.CSS_SELECTOR, "p.message-error")
+            if error_message and "unfortunately no appointments available" in error_message.text:
+                send_telegram_message("❌ No appointments found.")
+                print("No appointments found. Exiting early.")
+                return
+        except Exception:
+            # No error message found, continue
+            pass
+
         print("Waiting for CalendarId dropdown...")
         WebDriverWait(driver, 10).until(
             EC.visibility_of_element_located((By.ID, "CalendarId"))
@@ -83,7 +94,6 @@ def perform_actions():
         for opt in options:
             print(f"- {opt}")
 
-        # Telegram if changed
         if current_count != expected_count:
             send_telegram_message(
                 f"⚠️ *Options changed*: found *{current_count}* vs expected *{expected_count}*"
@@ -104,7 +114,6 @@ def perform_actions():
             send_telegram_message("❌ No option containing 'Student' or 'Bachelor' found!")
             return
 
-        # Click 'Next' three times
         for i in range(3):
             print(f"Clicking Next button ({i+1}/3)...")
             next_button = driver.find_element(By.XPATH, "//input[@name='Command' and @value='Next']")
@@ -116,7 +125,7 @@ def perform_actions():
             print("Page Title:", driver.title)
 
         expected_message = "For your selection there are unfortunately no appointments available"
-        time.sleep(2)  # Wait for possible error message to appear
+        time.sleep(2)
 
         try:
             error_message = driver.find_element(By.CSS_SELECTOR, "p.message-error")
