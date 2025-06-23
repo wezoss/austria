@@ -39,8 +39,9 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
         print(f"Failed to send Telegram message: {e}")
 
 def perform_actions():
-    # Headless Chrome setup for GitHub Actions Linux
+    # Headless Chromium setup for GitHub Actions Linux
     chrome_options = Options()
+    chrome_options.binary_location = '/usr/bin/chromium-browser'
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument('--no-sandbox')
