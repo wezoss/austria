@@ -8,6 +8,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from datetime import datetime
 
 # --- Telegram Notification ---
 def send_telegram_message(message, bot_token=None, chat_id=None):
@@ -17,9 +18,17 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
         print("Telegram credentials not set.")
         return
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    # Limit message to Telegram's 4096 char max
+    if len(message) > 4000:
+        message = message[:4000] + "\n... (truncated)"
+    formatted_message = (
+        f"🤖 *Appointment Checker*\n\n"
+        f"{message}\n\n"
+        f"📅 Time: `{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC`"
+    )
     payload = {
         "chat_id": chat_id,
-        "text": message,
+        "text": formatted_message,
         "parse_mode": "Markdown",
         "disable_web_page_preview": True
     }
@@ -41,10 +50,10 @@ def perform_actions():
 
     print("Starting appointment check...")
 
-    driver.get("https://appointment.bmeia.gv.at")
-    time.sleep(3)
-
     try:
+        driver.get("https://appointment.bmeia.gv.at")
+        time.sleep(3)
+
         dropdown = Select(driver.find_element(By.ID, "Office"))
         dropdown.select_by_visible_text("KAIRO")
         submit_button = driver.find_element(By.NAME, "Command")
@@ -68,8 +77,7 @@ def perform_actions():
             send_telegram_message(
                 f"⚠️ *Options changed*: found *{current_count}* vs expected *{expected_count}*"
             )
-            driver.quit()
-            sys.exit(0)
+            return
 
         selected_option = None
         for opt in options:
@@ -83,11 +91,10 @@ def perform_actions():
             print(f"Selected option: {selected_option}")
         else:
             send_telegram_message("❌ No option containing 'Student' or 'Bachelor' found!")
-            driver.quit()
-            sys.exit(0)
+            return
 
         # Click 'Next' three times
-        for _ in range(3):
+        for i in range(3):
             next_button = driver.find_element(By.XPATH, "//input[@name='Command' and @value='Next']")
             next_button.click()
             WebDriverWait(driver, 10).until(
@@ -115,5 +122,5 @@ def perform_actions():
         driver.quit()
 
 if __name__ == "__main__":
-    print(f"Script started at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Script started at {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
     perform_actions()
