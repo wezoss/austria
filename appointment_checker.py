@@ -1,6 +1,5 @@
 import requests
 from bs4 import BeautifulSoup
-import time
 import os
 from datetime import datetime
 
@@ -31,7 +30,6 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
         return False
 
 def print_snippet(text, phrase=None, window=80):
-    """Show a snippet of text around a phrase for debugging."""
     if not phrase or phrase.lower() not in text.lower():
         return text[:window] + ("..." if len(text) > window else "")
     idx = text.lower().find(phrase.lower())
@@ -168,13 +166,47 @@ def perform_appointment_check():
             current_response = session.post(form_action_next, data=form_data_next, timeout=30)
             print(f"   ...Status: {current_response.status_code}")
 
-        # Print final page HTML to console for debugging
+        # --- NEW: Submit reservation details form ---
+        print(f"➡️ Step 6: Submit reservation details form")
+        soup = BeautifulSoup(current_response.content, 'html.parser')
+        form = soup.find('form')
+        if not form:
+            print("❌ Reservation form not found!")
+            send_telegram_message("❌ Reservation form not found!")
+            return
+
+        form_data_reserve = {}
+        for inp in form.find_all(['input', 'select']):
+            name = inp.get('name')
+            if not name:
+                continue
+            if inp.get('type') == 'hidden':
+                form_data_reserve[name] = inp.get('value', '')
+            elif inp.name == 'select' and name == 'PersonCount':
+                # Default to the first option (should be '1')
+                options = inp.find_all('option')
+                if options:
+                    form_data_reserve[name] = options[0].get('value', '1')
+                else:
+                    form_data_reserve[name] = '1'
+            elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
+                form_data_reserve[name] = inp.get('value')
+
+        form_action_reserve = form.get('action', '')
+        if form_action_reserve.startswith('/'):
+            form_action_reserve = "https://appointment.bmeia.gv.at" + form_action_reserve
+        elif not form_action_reserve.startswith('http'):
+            form_action_reserve = "https://appointment.bmeia.gv.at/" + form_action_reserve
+
+        current_response = session.post(form_action_reserve, data=form_data_reserve, timeout=30)
+        print(f"   ...Status: {current_response.status_code}")
+
+        # Print and check the REAL final page!
         print("========= FINAL PAGE HTML START =========")
         print(current_response.text)
         print("========= END FINAL PAGE HTML =========")
 
-        # Final page: Check for "no appointments" message
-        print("➡️ Step 6: Inspect final page for appointment status")
+        print("➡️ Step 7: Inspect final page for appointment status")
         final_soup = BeautifulSoup(current_response.content, 'html.parser')
         expected_message = "For your selection there are unfortunately no appointments available"
         error_message_element = final_soup.find('p', class_='message-error')
@@ -207,4 +239,4 @@ def perform_appointment_check():
         print(f"❌ Exception: {str(e)}")
 
 if __name__ == "__main__":
-    perform_appointment_check() 
+    perform_appointment_check()
