@@ -4,7 +4,6 @@ import time
 import os
 import sys
 from datetime import datetime
-import json
 
 def send_telegram_message(message, bot_token=None, chat_id=None):
     """Send message via Telegram Bot"""
@@ -18,7 +17,11 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
             
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         
-        formatted_message = f"""🤖 *Debug Mode*
+        # Split long messages
+        if len(message) > 4000:
+            message = message[:4000] + "... (truncated)"
+        
+        formatted_message = f"""🤖 *Enhanced Debug*
 
 {message}
 
@@ -38,57 +41,8 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
         print(f"❌ Error sending Telegram: {e}")
         return False
 
-def debug_page_content(soup, step_name):
-    """Debug function to show what's actually on the page"""
-    print(f"\n🔍 DEBUGGING {step_name.upper()}:")
-    
-    # Show page title
-    title = soup.title.string if soup.title else "No title"
-    print(f"📄 Page title: {title}")
-    
-    # Show all form elements
-    forms = soup.find_all('form')
-    print(f"📋 Found {len(forms)} form(s)")
-    
-    for i, form in enumerate(forms, 1):
-        print(f"   Form {i}:")
-        print(f"   - Action: {form.get('action', 'No action')}")
-        
-        # Show all inputs and selects
-        inputs = form.find_all(['input', 'select'])
-        print(f"   - Found {len(inputs)} input/select elements:")
-        
-        for inp in inputs:
-            name = inp.get('name', 'No name')
-            input_type = inp.get('type', inp.name)
-            input_id = inp.get('id', 'No ID')
-            
-            if inp.name == 'select':
-                options = inp.find_all('option')
-                print(f"     • SELECT: name='{name}', id='{input_id}', {len(options)} options")
-                for opt in options[:3]:  # Show first 3 options
-                    print(f"       - {opt.text.strip()}")
-                if len(options) > 3:
-                    print(f"       - ... and {len(options)-3} more")
-            else:
-                value = inp.get('value', 'No value')
-                print(f"     • INPUT: name='{name}', type='{input_type}', id='{input_id}', value='{value}'")
-    
-    # Show any error messages
-    error_msgs = soup.find_all('p', class_='message-error')
-    if error_msgs:
-        print(f"❌ Found {len(error_msgs)} error message(s):")
-        for msg in error_msgs:
-            print(f"   - {msg.get_text().strip()}")
-    
-    # Show first 300 chars of page text
-    page_text = soup.get_text()
-    clean_text = ' '.join(page_text.split())[:300]
-    print(f"📝 Page text preview: {clean_text}...")
-    print("-" * 60)
-
-def perform_debug_check():
-    """Debug version to see exactly what's happening"""
+def perform_enhanced_debug():
+    """Enhanced debug to see exact form submission details"""
     
     session = requests.Session()
     
@@ -99,158 +53,261 @@ def perform_debug_check():
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'no-cache'
     })
     
     try:
-        print(f"🚀 DEBUG MODE: Starting at {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        print(f"🚀 ENHANCED DEBUG: Starting at {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
         
         # Step 1: Load main page
-        print("1️⃣ Loading main page...")
+        print("=" * 60)
+        print("STEP 1: LOADING MAIN PAGE")
+        print("=" * 60)
+        
         response1 = session.get("https://appointment.bmeia.gv.at", timeout=30)
         
-        print(f"📊 Main page response: HTTP {response1.status_code}")
-        print(f"📊 Content length: {len(response1.content)} bytes")
-        print(f"📊 Content type: {response1.headers.get('content-type', 'Unknown')}")
+        print(f"Response Status: {response1.status_code}")
+        print(f"Response URL: {response1.url}")
+        print(f"Content Length: {len(response1.content)}")
         
         if response1.status_code != 200:
             send_telegram_message(f"❌ Main page failed: HTTP {response1.status_code}")
             return
             
         soup1 = BeautifulSoup(response1.content, 'html.parser')
-        debug_page_content(soup1, "MAIN PAGE")
         
-        # Check if Office dropdown exists
-        office_select = soup1.find('select', {'id': 'Office'})
+        # Show page title
+        title = soup1.title.string if soup1.title else "No title"
+        print(f"Page Title: {title}")
+        
+        # Find and analyze the form
+        print("\n" + "-" * 40)
+        print("ANALYZING MAIN PAGE FORM")
+        print("-" * 40)
+        
+        forms = soup1.find_all('form')
+        print(f"Found {len(forms)} form(s)")
+        
+        if not forms:
+            send_telegram_message("❌ No forms found on main page!")
+            return
+            
+        form1 = forms[0]  # Use first form
+        print(f"Form action: '{form1.get('action', 'No action')}'")
+        print(f"Form method: '{form1.get('method', 'No method')}'")
+        
+        # Show ALL form elements in detail
+        print(f"\nALL FORM ELEMENTS:")
+        all_elements = form1.find_all(['input', 'select', 'textarea', 'button'])
+        
+        for i, elem in enumerate(all_elements, 1):
+            print(f"\n{i}. {elem.name.upper()}:")
+            print(f"   name: '{elem.get('name', 'No name')}'")
+            print(f"   id: '{elem.get('id', 'No ID')}'")
+            print(f"   type: '{elem.get('type', 'No type')}'")
+            print(f"   value: '{elem.get('value', 'No value')}'")
+            
+            if elem.name == 'select':
+                options = elem.find_all('option')
+                print(f"   options ({len(options)}):")
+                for j, opt in enumerate(options):
+                    opt_value = opt.get('value', 'No value')
+                    opt_text = opt.text.strip()
+                    selected = "SELECTED" if opt.get('selected') else ""
+                    print(f"     {j+1}. value='{opt_value}' text='{opt_text}' {selected}")
+        
+        # Find Office dropdown specifically
+        print(f"\n" + "-" * 40)
+        print("OFFICE DROPDOWN ANALYSIS")
+        print("-" * 40)
+        
+        office_select = soup1.find('select', {'id': 'Office'}) or soup1.find('select', {'name': 'Office'})
+        
         if not office_select:
-            send_telegram_message("❌ DEBUG: Office dropdown not found on main page!")
+            print("❌ Office dropdown not found by ID or name!")
+            # Try to find any select with office-related options
+            all_selects = soup1.find_all('select')
+            print(f"Found {len(all_selects)} select elements total:")
+            for sel in all_selects:
+                print(f"  - name: '{sel.get('name')}', id: '{sel.get('id')}'")
+            send_telegram_message("❌ Office dropdown not found!")
             return
-            
+        
         print("✅ Office dropdown found!")
+        print(f"Office dropdown name: '{office_select.get('name')}'")
+        print(f"Office dropdown id: '{office_select.get('id')}'")
         
-        # Find KAIRO option
-        kairo_option = None
+        # Analyze KAIRO option
         options = office_select.find_all('option')
-        print(f"📋 Office dropdown has {len(options)} options:")
+        print(f"\nOffice options ({len(options)}):")
         
+        kairo_option = None
         for i, option in enumerate(options):
-            option_text = option.text.strip()
-            option_value = option.get('value', 'No value')
-            print(f"   {i+1}. '{option_text}' (value: '{option_value}')")
+            opt_value = option.get('value', 'No value')
+            opt_text = option.text.strip()
+            is_kairo = 'KAIRO' in opt_text.upper()
+            print(f"  {i+1}. value='{opt_value}' text='{opt_text}' {'← KAIRO!' if is_kairo else ''}")
             
-            if 'KAIRO' in option_text.upper():
+            if is_kairo:
                 kairo_option = option
-                print(f"   ✅ KAIRO found at position {i+1}")
-                
+        
         if not kairo_option:
-            send_telegram_message("❌ DEBUG: KAIRO option not found!")
+            send_telegram_message("❌ KAIRO option not found in Office dropdown!")
             return
             
+        print(f"\n✅ KAIRO found: value='{kairo_option.get('value')}', text='{kairo_option.text.strip()}'")
+        
         # Step 2: Prepare form submission
-        print("\n2️⃣ Preparing form submission...")
+        print(f"\n" + "=" * 60)
+        print("STEP 2: PREPARING FORM SUBMISSION")
+        print("=" * 60)
         
-        form1 = soup1.find('form')
-        if not form1:
-            send_telegram_message("❌ DEBUG: No form found on main page!")
-            return
+        form_data = {}
+        
+        # Process each form element
+        for elem in form1.find_all(['input', 'select']):
+            name = elem.get('name')
+            if not name:
+                continue
+                
+            if name == 'Office' or (elem.get('id') == 'Office'):
+                form_data[name] = kairo_option.get('value')
+                print(f"✅ {name} = '{kairo_option.get('value')}' (KAIRO selected)")
+                
+            elif elem.get('type') == 'hidden':
+                value = elem.get('value', '')
+                form_data[name] = value
+                print(f"🔒 {name} = '{value}' (hidden field)")
+                
+            elif elem.get('type') == 'submit':
+                value = elem.get('value', 'Submit')
+                form_data[name] = value
+                print(f"🔘 {name} = '{value}' (submit button)")
+                
+            elif elem.name == 'select':
+                # For other selects, use their default/selected value
+                selected_opt = elem.find('option', selected=True)
+                if selected_opt:
+                    value = selected_opt.get('value', '')
+                else:
+                    # Use first option if none selected
+                    first_opt = elem.find('option')
+                    value = first_opt.get('value', '') if first_opt else ''
+                form_data[name] = value
+                print(f"📋 {name} = '{value}' (select default)")
+                
+            elif elem.get('type') in ['text', 'email', 'tel']:
+                value = elem.get('value', '')
+                form_data[name] = value
+                print(f"📝 {name} = '{value}' (text input)")
+        
+        print(f"\nFINAL FORM DATA:")
+        for key, value in form_data.items():
+            print(f"  '{key}': '{value}'")
+        
+        # Get form action
+        form_action = form1.get('action', '')
+        if not form_action:
+            form_action = response1.url  # Use current URL if no action
+        elif form_action.startswith('/'):
+            form_action = "https://appointment.bmeia.gv.at" + form_action
+        elif not form_action.startswith('http'):
+            form_action = "https://appointment.bmeia.gv.at/" + form_action
             
-        print(f"📋 Form action: {form1.get('action', 'No action')}")
-        print(f"📋 Form method: {form1.get('method', 'No method')}")
+        print(f"\nForm will be submitted to: {form_action}")
         
-        # Collect ALL form data
-        form_data1 = {}
-        all_inputs = form1.find_all(['input', 'select'])
+        # Step 3: Submit the form
+        print(f"\n" + "=" * 60)
+        print("STEP 3: SUBMITTING FORM")
+        print("=" * 60)
         
-        print(f"📋 Processing {len(all_inputs)} form elements:")
+        print("Waiting 2 seconds before submission...")
+        time.sleep(2)
         
-        for inp in all_inputs:
-            name = inp.get('name')
-            if name:
-                if name == 'Office':
-                    form_data1[name] = kairo_option.get('value')
-                    print(f"   ✅ Office = '{kairo_option.get('value')}' (KAIRO)")
-                elif inp.get('type') == 'hidden':
-                    value = inp.get('value', '')
-                    form_data1[name] = value
-                    print(f"   🔒 Hidden: {name} = '{value}'")
-                elif inp.get('type') == 'submit':
-                    value = inp.get('value', 'Submit')
-                    form_data1[name] = value
-                    print(f"   🔘 Submit: {name} = '{value}'")
-                elif inp.name == 'select' and name != 'Office':
-                    # Handle other select elements
-                    value = inp.get('value', '')
-                    form_data1[name] = value
-                    print(f"   📋 Select: {name} = '{value}'")
+        response2 = session.post(form_action, data=form_data, timeout=30)
         
-        print(f"\n📤 Final form data: {form_data1}")
+        print(f"Submission Response Status: {response2.status_code}")
+        print(f"Submission Response URL: {response2.url}")
+        print(f"Response Content Length: {len(response2.content)}")
         
-        # Get form action URL
-        form_action1 = form1.get('action', '')
-        if form_action1.startswith('/'):
-            form_action1 = "https://appointment.bmeia.gv.at" + form_action1
-        elif not form_action1.startswith('http'):
-            form_action1 = "https://appointment.bmeia.gv.at/" + form_action1
-            
-        print(f"📤 Submitting to: {form_action1}")
-        
-        # Step 3: Submit form
-        print("\n3️⃣ Submitting first form...")
-        time.sleep(2)  # Wait before submission
-        
-        response2 = session.post(form_action1, data=form_data1, timeout=30)
-        
-        print(f"📊 Form submission response: HTTP {response2.status_code}")
-        print(f"📊 Response length: {len(response2.content)} bytes")
-        print(f"📊 Response URL: {response2.url}")
+        # Check response headers
+        print(f"\nResponse Headers:")
+        for header, value in response2.headers.items():
+            if header.lower() in ['location', 'content-type', 'set-cookie']:
+                print(f"  {header}: {value}")
         
         if response2.status_code != 200:
-            send_telegram_message(f"❌ DEBUG: Form submission failed: HTTP {response2.status_code}")
+            send_telegram_message(f"❌ Form submission failed: HTTP {response2.status_code}")
             return
-            
-        # Wait for page to load
+        
+        # Wait for page processing
+        print("Waiting 3 seconds for page to load...")
         time.sleep(3)
         
+        # Step 4: Analyze the response page
+        print(f"\n" + "=" * 60)
+        print("STEP 4: ANALYZING RESPONSE PAGE")
+        print("=" * 60)
+        
         soup2 = BeautifulSoup(response2.content, 'html.parser')
-        debug_page_content(soup2, "AFTER FORM SUBMISSION")
         
-        # Check for CalendarId
+        # Page title
+        title2 = soup2.title.string if soup2.title else "No title"
+        print(f"Response Page Title: {title2}")
+        
+        # Look for CalendarId
         calendar_select = soup2.find('select', {'id': 'CalendarId'})
+        print(f"CalendarId found: {'YES' if calendar_select else 'NO'}")
         
+        # Show all elements with IDs
+        elements_with_id = soup2.find_all(attrs={'id': True})
+        print(f"\nElements with IDs ({len(elements_with_id)}):")
+        for elem in elements_with_id:
+            print(f"  {elem.name}: id='{elem.get('id')}'")
+        
+        # Show all forms on response page
+        response_forms = soup2.find_all('form')
+        print(f"\nForms on response page: {len(response_forms)}")
+        for i, form in enumerate(response_forms, 1):
+            print(f"  Form {i}: action='{form.get('action')}', method='{form.get('method')}'")
+        
+        # Look for any error messages
+        error_elements = soup2.find_all(['p', 'div', 'span'], class_=lambda x: x and 'error' in x.lower())
+        if error_elements:
+            print(f"\nPossible error messages ({len(error_elements)}):")
+            for elem in error_elements:
+                print(f"  - {elem.get_text().strip()}")
+        
+        # Show first 500 chars of page text
+        page_text = soup2.get_text()
+        clean_text = ' '.join(page_text.split())[:500]
+        print(f"\nPage text preview:\n{clean_text}...")
+        
+        # Send summary to Telegram
         if calendar_select:
-            print("🎉 SUCCESS: CalendarId dropdown found!")
-            options = calendar_select.find_all('option')
-            print(f"📋 Calendar has {len(options)} options:")
-            for i, opt in enumerate(options):
-                print(f"   {i+1}. {opt.text.strip()}")
+            summary = "🎉 SUCCESS: Found CalendarId dropdown!"
         else:
-            print("❌ CalendarId dropdown still not found")
-            
-            # Check what elements DO exist with 'id' attributes
-            elements_with_id = soup2.find_all(attrs={'id': True})
-            print(f"📋 Found {len(elements_with_id)} elements with ID attributes:")
-            for elem in elements_with_id[:10]:  # Show first 10
-                print(f"   - {elem.name}: id='{elem.get('id')}'")
-                
-            # Send debug info to Telegram
-            debug_message = f"""🔍 DEBUG: CalendarId not found
+            summary = f"""❌ ISSUE: CalendarId not found
 
-Form submission got HTTP 200 but CalendarId missing.
+Response page title: {title2}
+Elements with IDs: {len(elements_with_id)}
+Forms found: {len(response_forms)}
 
-Found {len(elements_with_id)} elements with IDs.
-Page title: {soup2.title.string if soup2.title else 'None'}
-
-This suggests the form didn't navigate to the expected page."""
-            
-            send_telegram_message(debug_message)
+Possible causes:
+1. Form validation failed
+2. Missing required fields  
+3. Need to handle redirects
+4. Website changed structure"""
         
-        print("✅ Debug check completed")
+        send_telegram_message(summary)
+        
+        print("✅ Enhanced debug completed")
         
     except Exception as e:
-        error_msg = f"❌ Debug error: {str(e)}"
+        error_msg = f"❌ Enhanced debug error: {str(e)}"
         print(error_msg)
         send_telegram_message(error_msg)
 
 if __name__ == "__main__":
-    send_telegram_message("🔍 Starting DEBUG mode to investigate form submission issue...")
-    perform_debug_check()
+    perform_enhanced_debug()
