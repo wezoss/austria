@@ -29,6 +29,11 @@ def send_telegram_message(message, bot_token=None, chat_id=None):
         print(f"❌ Error sending Telegram: {e}")
         return False
 
+def print_html(label, html):
+    print(f"\n========= {label} PAGE HTML START =========")
+    print(html)
+    print(f"========= END {label} PAGE HTML =========\n")
+
 def print_snippet(text, phrase=None, window=80):
     if not phrase or phrase.lower() not in text.lower():
         return text[:window] + ("..." if len(text) > window else "")
@@ -49,9 +54,11 @@ def perform_appointment_check():
 
     try:
         print(f"🚀 Appointment checker started at {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
+        # Step 1: Main page
         print("➡️ Step 1: Load main page")
         response1 = session.get("https://appointment.bmeia.gv.at", timeout=30)
         print(f"   ...Status: {response1.status_code}")
+        print_html("STEP 1", response1.text)
         soup1 = BeautifulSoup(response1.content, 'html.parser')
 
         form1 = soup1.find('form')
@@ -91,9 +98,11 @@ def perform_appointment_check():
         elif not form_action1.startswith('http'):
             form_action1 = "https://appointment.bmeia.gv.at/" + form_action1
 
+        # Step 2: Office form
         print(f"➡️ Step 2: Submit Office form with Office={form_data1['Office']!r}")
         response2 = session.post(form_action1, data=form_data1, timeout=30)
         print(f"   ...Status: {response2.status_code}")
+        print_html("STEP 2", response2.text)
         soup2 = BeautifulSoup(response2.content, 'html.parser')
 
         calendar_select = soup2.find('select', {'id': 'CalendarId'})
@@ -133,9 +142,11 @@ def perform_appointment_check():
         elif not form_action2.startswith('http'):
             form_action2 = "https://appointment.bmeia.gv.at/" + form_action2
 
+        # Step 3: CalendarId form
         print(f"➡️ Step 3: Submit CalendarId form with CalendarId={form_data2['CalendarId']!r}")
         current_response = session.post(form_action2, data=form_data2, timeout=30)
         print(f"   ...Status: {current_response.status_code}")
+        print_html("STEP 3", current_response.text)
 
         # Next 2 forms: just "Next"
         for idx in range(2):
@@ -161,6 +172,7 @@ def perform_appointment_check():
                 form_action_next = "https://appointment.bmeia.gv.at/" + form_action_next
             current_response = session.post(form_action_next, data=form_data_next, timeout=30)
             print(f"   ...Status: {current_response.status_code}")
+            print_html(f"STEP {4+idx}", current_response.text)
 
         # Step 6: Submit reservation form (PersonCount, Command=Next)
         print(f"➡️ Step 6: Submit reservation form")
@@ -187,9 +199,7 @@ def perform_appointment_check():
                         break
                 else:
                     form_data_reserve[name] = '1'
-            # Do not automatically add submit buttons here
 
-        # Add the required "Command=Next" to actually submit
         form_data_reserve["Command"] = "Next"
 
         form_action_reserve = form.get('action', '')
@@ -200,12 +210,9 @@ def perform_appointment_check():
 
         current_response = session.post(form_action_reserve, data=form_data_reserve, timeout=30)
         print(f"   ...Status: {current_response.status_code}")
+        print_html("STEP 6 (RESERVATION SUBMIT)", current_response.text)
 
-        # Now print and check the REAL final page!
-        print("========= FINAL PAGE HTML START =========")
-        print(current_response.text)
-        print("========= END FINAL PAGE HTML =========")
-
+        # Step 7: Inspect final page for appointment status
         print("➡️ Step 7: Inspect final page for appointment status")
         final_soup = BeautifulSoup(current_response.content, 'html.parser')
         expected_message = "For your selection there are unfortunately no appointments available"
