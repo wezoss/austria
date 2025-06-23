@@ -168,10 +168,10 @@ def perform_appointment_check():
             current_response = session.post(form_action_next, data=form_data_next, timeout=30)
             print(f"   ...Status: {current_response.status_code}")
 
-        # Save final page for debugging
-        with open("final_page.html", "w", encoding="utf-8") as f:
-            f.write(current_response.text)
-        print("Saved final page HTML to final_page.html")
+        # Print final page HTML to console for debugging
+        print("========= FINAL PAGE HTML START =========")
+        print(current_response.text)
+        print("========= END FINAL PAGE HTML =========")
 
         # Final page: Check for "no appointments" message
         print("➡️ Step 6: Inspect final page for appointment status")
@@ -191,7 +191,6 @@ def perform_appointment_check():
                 print("Result: Different error message")
                 send_telegram_message(f"⚠️ Unexpected error message:\n\n{error_text}")
         elif expected_message.lower() in page_text.lower():
-            # Sometimes it's not in message-error but somewhere else
             snippet = print_snippet(page_text, expected_message)
             print(f"   ...Found expected message in page: {snippet!r}")
             found = True
