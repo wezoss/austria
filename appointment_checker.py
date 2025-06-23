@@ -71,9 +71,7 @@ def perform_appointment_check():
             send_telegram_message("❌ KAIRO option not found in Office dropdown")
             return
 
-        chosen_value = kairo_option.get('value')
-        if chosen_value is None or chosen_value == "":
-            chosen_value = kairo_option.text.strip()
+        chosen_value = kairo_option.get('value') or kairo_option.text.strip()
 
         form_data1 = {}
         for inp in form1.find_all(['input', 'select']):
@@ -114,9 +112,7 @@ def perform_appointment_check():
             send_telegram_message("❌ No 'bachelor' option in CalendarId")
             return
 
-        chosen_cal_value = selected_option.get('value')
-        if chosen_cal_value is None or chosen_cal_value == "":
-            chosen_cal_value = selected_option.text.strip()
+        chosen_cal_value = selected_option.get('value') or selected_option.text.strip()
 
         form2 = soup2.find('form')
         form_data2 = {}
@@ -166,12 +162,48 @@ def perform_appointment_check():
             current_response = session.post(form_action_next, data=form_data_next, timeout=30)
             print(f"   ...Status: {current_response.status_code}")
 
-        # No further submission! Just check the result page.
+        # Now submit the reservation form with PersonCount and Command=Next
+        print(f"➡️ Step 6: Submit reservation form")
+        soup = BeautifulSoup(current_response.content, 'html.parser')
+        form = soup.find('form')
+        if not form:
+            print("❌ Reservation form not found!")
+            send_telegram_message("❌ Reservation form not found!")
+            return
+
+        form_data_reserve = {}
+        for inp in form.find_all(['input', 'select']):
+            name = inp.get('name')
+            if not name:
+                continue
+            if inp.get('type') == 'hidden':
+                form_data_reserve[name] = inp.get('value', '')
+            elif inp.name == 'select' and name == 'PersonCount':
+                # pick value by text (should be '1')
+                options = inp.find_all('option')
+                for opt in options:
+                    if opt.text.strip() == '1':
+                        form_data_reserve[name] = opt.get('value', '1')
+                        break
+                else:
+                    form_data_reserve[name] = '1'
+            elif inp.get('type') == 'submit' and inp.get('value') == 'Next':
+                form_data_reserve[name] = inp.get('value')
+
+        form_action_reserve = form.get('action', '')
+        if form_action_reserve.startswith('/'):
+            form_action_reserve = "https://appointment.bmeia.gv.at" + form_action_reserve
+        elif not form_action_reserve.startswith('http'):
+            form_action_reserve = "https://appointment.bmeia.gv.at/" + form_action_reserve
+
+        current_response = session.post(form_action_reserve, data=form_data_reserve, timeout=30)
+        print(f"   ...Status: {current_response.status_code}")
+
         print("========= FINAL PAGE HTML START =========")
         print(current_response.text)
         print("========= END FINAL PAGE HTML =========")
 
-        print("➡️ Step 6: Inspect final page for appointment status")
+        print("➡️ Step 7: Inspect real final page for appointment status")
         final_soup = BeautifulSoup(current_response.content, 'html.parser')
         expected_message = "For your selection there are unfortunately no appointments available"
         page_text = final_soup.get_text(separator=" ", strip=True)
@@ -193,4 +225,4 @@ def perform_appointment_check():
         print(f"❌ Exception: {str(e)}")
 
 if __name__ == "__main__":
-    perform_appointment_check() 
+    perform_appointment_check()
