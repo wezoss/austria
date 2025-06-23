@@ -1,6 +1,5 @@
 import sys
 import time
-import logging
 import os
 import requests
 import traceback
@@ -67,105 +66,49 @@ def perform_actions():
         print("Page Title:", driver.title)
 
         time.sleep(2)
-        # Check if error message and/or calendar dropdown is present
-        error_message = None
-        calendar_present = False
-        appointment_heading = False
 
+        # Check for error message
+        error_message = None
         try:
             error_elem = driver.find_element(By.CSS_SELECTOR, "p.message-error")
             error_message = error_elem.text.strip()
         except Exception:
-            pass
+            error_message = None
 
+        # Check if appointment heading appears
+        appointment_heading = False
         try:
-            driver.find_element(By.ID, "CalendarId")
-            calendar_present = True
-        except Exception:
-            calendar_present = False
-
-        try:
-            # check for appointment heading
             headings = driver.find_elements(By.TAG_NAME, "h2")
             for h in headings:
                 if "Appointments available" in h.text:
                     appointment_heading = True
                     break
         except Exception:
-            pass
+            appointment_heading = False
+
+        # Check if calendar dropdown is present
+        calendar_present = False
+        try:
+            driver.find_element(By.ID, "CalendarId")
+            calendar_present = True
+        except Exception:
+            calendar_present = False
+
+        # Decision logic
+        if appointment_heading or calendar_present:
+            send_telegram_message("🎉 *Possible appointments found!*\nCheck the website immediately.")
+            print("Possible appointments found (heading or calendar present).")
+            return
 
         if error_message:
-            print(f"Error message on page: {error_message}")
-            # If error message but appointments or calendar also present, treat as possible appointments
-            if calendar_present or appointment_heading:
-                send_telegram_message("🎉 *Possible appointments found!*\nCheck the website immediately.")
-                print("Possible appointments found (calendar or heading present despite error).")
-                return
-            else:
-                send_telegram_message("❌ No appointments found.")
-                print("No appointments found. Exiting early.")
-                return
-
-        if not calendar_present:
-            send_telegram_message("❌ No calendar available and no explicit error -- site may have changed.")
-            print("No calendar dropdown found and no explicit error. Exiting.")
+            send_telegram_message("❌ No appointments found.")
+            print("No appointments found. Exiting early.")
             return
 
-        print("Waiting for CalendarId dropdown...")
-        WebDriverWait(driver, 10).until(
-            EC.visibility_of_element_located((By.ID, "CalendarId"))
-        )
-
-        calendar_dropdown = Select(driver.find_element(By.ID, "CalendarId"))
-        options = [option.text.strip() for option in calendar_dropdown.options]
-        current_count = len(options)
-        expected_count = 9
-
-        print(f"Available options ({current_count}):")
-        for opt in options:
-            print(f"- {opt}")
-
-        if current_count != expected_count:
-            send_telegram_message(
-                f"⚠️ *Options changed*: found *{current_count}* vs expected *{expected_count}*"
-            )
-            return
-
-        selected_option = None
-        for opt in options:
-            lower_opt = opt.lower()
-            if "student" in lower_opt or "bachelor" in lower_opt:
-                selected_option = opt
-                break
-
-        if selected_option:
-            calendar_dropdown.select_by_visible_text(selected_option)
-            print(f"Selected option: {selected_option}")
-        else:
-            send_telegram_message("❌ No option containing 'Student' or 'Bachelor' found!")
-            return
-
-        for i in range(3):
-            print(f"Clicking Next button ({i+1}/3)...")
-            next_button = driver.find_element(By.XPATH, "//input[@name='Command' and @value='Next']")
-            next_button.click()
-            WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//input[@name='Command' and @value='Next']"))
-            )
-            print("Current URL:", driver.current_url)
-            print("Page Title:", driver.title)
-
-        expected_message = "For your selection there are unfortunately no appointments available"
-        time.sleep(2)
-        try:
-            error_message = driver.find_element(By.CSS_SELECTOR, "p.message-error")
-            print(f"Error message: {error_message.text}")
-            if error_message.text.strip() == expected_message:
-                send_telegram_message("❌ No appointments found.")
-            else:
-                send_telegram_message("🎉 *Possible appointments found!*\nCheck the website immediately.")
-        except Exception:
-            send_telegram_message("🎉 *Possible appointments found!*\nCheck the website immediately.")
+        # If neither heading, calendar, nor error message, site may have changed
+        send_telegram_message("❌ No calendar, no error, no appointments heading -- site may have changed.")
+        print("No calendar, no error, no heading. Exiting.")
+        return
 
     except Exception as e:
         tb = traceback.format_exc()
